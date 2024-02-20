@@ -1,31 +1,46 @@
 using Microsoft.Playwright;
 using Microsoft.Playwright.NUnit;
+using NUnit.Allure.Core;
+using PlaywrightSoln.Classes;
+using PlaywrightSoln.Pages;
+using PlaywrightSoln.Utilities;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace PlaywrightSoln;
 
+[AllureNUnit]
+[Parallelizable(ParallelScope.Self)]
 public class NUnitPlaywright : PageTest
 {
+    private IPage page;
+    
     [SetUp]
     public async Task SetupAsync()
     {
-        await Page.GotoAsync(url: "https://www.saucedemo.com/");
+
+        page = await Context.NewPageAsync();
+        await page.GotoAsync(url: "https://www.saucedemo.com/", new PageGotoOptions
+        {
+            WaitUntil = WaitUntilState.DOMContentLoaded,
+
+        });
     }
 
     [Test]
-    public async Task Test1()
+    public async Task SauceDemoLogin()
     {
-        await Page.ClickAsync(selector: "[data-test=\"username\"]");
-        await Page.FillAsync(selector: "[data-test=\"username\"]", value: "standard_user");
-        await Page.ClickAsync(selector: "[data-test=\"password\"]");
-        await Page.FillAsync(selector: "[data-test=\"password\"]", value: "secret_sauce");
-        await Page.ClickAsync(selector: "[data-test=\"login-button\"]");
 
-        await Expect(Page.Locator(selector: "[class=\"app_logo\"]")).ToBeVisibleAsync();
+        Page.SetDefaultTimeout(10000);
+        LoginPage loginPage = new LoginPage(page);
 
-        await Page.ScreenshotAsync(new PageScreenshotOptions
-        {
-            Path = "screenshot.jpg"
-        });
+        page.Request += (_, request) => Console.WriteLine(request.Method + "---- " + request.Url);
+        page.Response += (_, response) => Console.WriteLine(response.Status + "---- " + response.Url);
+        string testDataFileName = "SauceDemoLogin";
+        IEnumerable<Credentials> credentials = CSVUtility.ReadCSV<Credentials>(testDataFileName);
+        await loginPage.Login(credentials.First().UserName, credentials.First().Password);
+        var isExist = await loginPage.IsAppLogoVisible();
+        Assert.IsTrue(isExist);
+
 
     }
 }
